@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #f4f7ff;
+    color: #253858;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #dbdde6;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  /* Light card — white with border */
+  .card {
+    background: #ffffff;
+    border: 1px solid #dbdde6;
+    border-radius: 12px;
+  }
+
+  /* Soft accent card */
+  .card-accent {
+    background: #edf4ff;
+    border: 1px solid #c7d9f5;
+    border-radius: 12px;
+  }
+
+  /* Legacy dark glass — kept for backward compat, now unused */
+  .glass {
+    background: rgba(15, 15, 40, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+  }
+
+  .glass-light {
+    background: rgba(30, 27, 75, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+
+  .text-gradient {
+    background: linear-gradient(168deg, #121224 8%, #0400bb 94%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Sound wave bars */
+.sound-wave-bar {
+  animation: sound-wave 0.8s ease-in-out infinite;
+}
+
+.sound-wave-bar:nth-child(1) { animation-delay: 0s; }
+.sound-wave-bar:nth-child(2) { animation-delay: 0.15s; }
+.sound-wave-bar:nth-child(3) { animation-delay: 0.3s; }
+.sound-wave-bar:nth-child(4) { animation-delay: 0.15s; }
+.sound-wave-bar:nth-child(5) { animation-delay: 0s; }
+
+/* Typing indicator dots */
+.typing-dot {
+  animation: typing-dots 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Shimmer loading effect */
+.shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.05) 0%,
+    rgba(139, 92, 246, 0.2) 50%,
+    rgba(99, 102, 241, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
