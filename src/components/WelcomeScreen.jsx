@@ -178,11 +178,6 @@ export default function WelcomeScreen({ onStart }) {
       {/* Header */}
       <div className="flex-shrink-0 bg-white flex items-center px-5 border-b border-[#dbdde6]/50"
            style={{ height: 56 }}>
-        <button className="mr-3 text-[#465166]" aria-label="Back">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
         <span className="font-bold text-[16px] text-[#465166]">Post a Job</span>
       </div>
 
@@ -233,7 +228,7 @@ export default function WelcomeScreen({ onStart }) {
       />
 
       {/* Bottom input card */}
-      <div className="flex-shrink-0 px-4 pb-8 relative z-10">
+      <div className="flex-shrink-0 px-4 relative z-10" style={{ paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))' }}>
         <div
           className="bg-white rounded-xl p-4 flex flex-col"
           style={{ border: '1px solid #dbdde6', gap: 12 }}
@@ -279,6 +274,7 @@ export default function WelcomeScreen({ onStart }) {
               d.mandatorySkills?.length && { label: `${d.mandatorySkills.length} skills`, color: '#166534', bg: '#f0fdf4' },
               d.location && { label: d.location, color: '#0369a1', bg: '#f0f9ff' },
               (d.experienceMin != null) && { label: `${d.experienceMin}–${d.experienceMax ?? d.experienceMin} yrs`, color: '#92400e', bg: '#fffbeb' },
+              d.qualification && { label: d.qualification, color: '#065f46', bg: '#ecfdf5' },
               (d.salaryMin != null) && { label: `₹${(d.salaryMin/100000).toFixed(1)}–${(d.salaryMax/100000).toFixed(1)}L`, color: '#581c87', bg: '#faf5ff' },
             ].filter(Boolean);
             return chips.length > 0 ? (

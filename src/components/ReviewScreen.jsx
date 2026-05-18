@@ -1,6 +1,28 @@
 import React, { useState } from 'react';
 
+// Broad category chips shown to recruiter
 const QUALIFICATIONS = ['10th', '12th', 'Diploma', 'Graduate', 'Post Graduate', 'Any'];
+
+// Map specific degrees → their broad category (for chip highlighting)
+const SPECIFIC_TO_BROAD = {
+  'B.Tech / BE': 'Graduate', 'BCA': 'Graduate', 'B.Sc': 'Graduate',
+  'B.Com': 'Graduate', 'BA': 'Graduate', 'B.Pharma': 'Graduate', 'MBBS': 'Graduate',
+  'LLB': 'Graduate', 'BBA': 'Graduate', 'B.Arch': 'Graduate',
+  'MBA': 'Post Graduate', 'M.Tech': 'Post Graduate', 'M.Sc': 'Post Graduate',
+  'CA': 'Post Graduate', 'MCA': 'Post Graduate', 'MA': 'Post Graduate',
+};
+
+// Returns the broad chip to highlight for any qualification string
+function toBroad(qual) {
+  if (!qual || qual === 'Any') return 'Any';
+  if (QUALIFICATIONS.includes(qual)) return qual;
+  return SPECIFIC_TO_BROAD[qual] || 'Graduate';
+}
+
+// Returns true if the value is a specific degree (not a broad chip)
+function isSpecific(qual) {
+  return !!qual && !QUALIFICATIONS.includes(qual);
+}
 const EXP_OPTIONS    = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '10+'];
 
 const INDUSTRY_OPTIONS = [
@@ -445,7 +467,7 @@ export default function ReviewScreen({ jobData, onSubmit, onBack }) {
       {/* Header */}
       <div className="flex-shrink-0 bg-white flex items-center px-5 z-10 relative"
         style={{ height: 56, borderBottom: '1px solid rgba(219,221,230,0.5)' }}>
-        <button className="mr-3 text-[#465166]" aria-label="Back">
+        <button onClick={onBack} className="mr-3 text-[#465166]" aria-label="Back">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
@@ -510,17 +532,35 @@ export default function ReviewScreen({ jobData, onSubmit, onBack }) {
         {/* Qualification */}
         <div className="flex flex-col gap-3">
           <FieldLabel>Candidate's qualification</FieldLabel>
+          {/* Broad category chips */}
           <div className="flex flex-wrap gap-2">
             {QUALIFICATIONS.map((q) => (
-              <button key={q} type="button" onClick={() => set('qualification', q)}
+              <button key={q} type="button"
+                onClick={() => {
+                  // If switching away from Graduate/PostGrad, clear the specific degree too
+                  const currentBroad = toBroad(form.qualification);
+                  if (q !== currentBroad) set('qualification', q);
+                  else set('qualification', q); // re-select broad clears specific
+                }}
                 className="px-4 py-2 rounded-full text-[13px] font-medium transition-all"
-                style={form.qualification === q
+                style={toBroad(form.qualification) === q
                   ? { background: '#4f46e5', color: '#fff', border: '1px solid #4f46e5' }
                   : { background: '#fff', color: '#6b7794', border: '1px solid #dbdde6' }}>
                 {q}
               </button>
             ))}
           </div>
+          {/* Specific degree input — shown when Graduate or Post Graduate is selected */}
+          {(toBroad(form.qualification) === 'Graduate' || toBroad(form.qualification) === 'Post Graduate') && (
+            <TextInput
+              value={isSpecific(form.qualification) ? form.qualification : ''}
+              onChange={(v) => {
+                const broad = toBroad(form.qualification);
+                set('qualification', v.trim() || broad);
+              }}
+              placeholder={`Specific degree, e.g. ${toBroad(form.qualification) === 'Graduate' ? 'B.Tech / BE, MBBS, LLB…' : 'MBA, M.Tech, CA…'}`}
+            />
+          )}
         </div>
 
         {/* Industry */}

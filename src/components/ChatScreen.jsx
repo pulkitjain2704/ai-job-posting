@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useWhisperRecognition } from '../hooks/useWhisperRecognition.js';
 
 // ── Sparkle icon ────────────────────────────────────────────────────────────
@@ -49,6 +49,93 @@ function MessageBubble({ message, onSpeak, isLast }) {
   );
 }
 
+// ── Job suggestion cards ─────────────────────────────────────────────────────
+function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) {
+  const [selected, setSelected] = useState(null);
+
+  const handleCardClick = (card) => {
+    if (disabled) return;
+    setSelected(card.id);
+  };
+
+  const handleAction = (action) => {
+    if (disabled || !selected) return;
+    const card = cards.find((c) => c.id === selected);
+    if (card) onSelect(card, action);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 mt-1 ml-9">
+      {/* Cards grid */}
+      <div className="flex flex-col gap-2">
+        {cards.map((card) => {
+          const isSelected = selected === card.id;
+          return (
+            <button
+              key={card.id}
+              onClick={() => handleCardClick(card)}
+              disabled={disabled}
+              className="text-left px-3.5 py-3 rounded-xl transition-all active:scale-[0.98]"
+              style={
+                isSelected
+                  ? { background: '#4f46e5', border: '1.5px solid #4f46e5' }
+                  : { background: '#fff', border: '1.5px solid #e0e4ef' }
+              }
+            >
+              <p
+                className="font-semibold text-[13px] leading-snug"
+                style={{ color: isSelected ? '#fff' : '#253858' }}
+              >
+                {card.title}
+              </p>
+              <p
+                className="text-[11px] mt-0.5 line-clamp-1"
+                style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : '#6b7794' }}
+              >
+                {card.mandatorySkills.slice(0, 3).join(' · ')}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Action buttons — appear after a card is selected */}
+      {selected && (
+        <div className="flex gap-2 mt-1 animate-fade-in">
+          <button
+            onClick={() => handleAction('prefill')}
+            disabled={disabled}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
+            style={{ background: '#253858', color: '#fff' }}
+          >
+            Pre-fill details
+          </button>
+          <button
+            onClick={() => handleAction('edit')}
+            disabled={disabled}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-medium transition-all active:scale-95"
+            style={{ background: '#fff', color: '#253858', border: '1.5px solid #dbdde6' }}
+          >
+            Edit details
+          </button>
+        </div>
+      )}
+
+      {/* Nothing resonating */}
+      {!selected && (
+        <button
+          onClick={onNothingResonating}
+          disabled={disabled}
+          className="self-start text-[12px] mt-0.5 transition-colors"
+          style={{ color: '#9ba3b5' }}
+        >
+          I don't find anything resonating →
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Typing indicator ─────────────────────────────────────────────────────────
 function TypingIndicator() {
   return (
@@ -70,7 +157,7 @@ function TypingIndicator() {
 }
 
 // ── Main ChatScreen ───────────────────────────────────────────────────────────
-export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak, onReview, hasJobData }) {
+export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak, onReview, hasJobData, onBack, onJobSelect, onNothingResonating }) {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef(null);
 
@@ -113,7 +200,7 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
         {/* Header */}
         <div className="flex-shrink-0 bg-white flex items-center px-5 z-10"
           style={{ height: 56, borderBottom: '1px solid rgba(219,221,230,0.5)' }}>
-          <button className="mr-3 text-[#465166]" aria-label="Back">
+          <button onClick={onBack} className="mr-3 text-[#465166]" aria-label="Back">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
@@ -139,13 +226,23 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
             // Show orb only on last AI message — and only when NOT loading
             // (while loading, the TypingIndicator carries the orb instead)
             const isLast = i === lastAssistantIdx && !isLoading;
+            const showCards = isLast && msg.suggestCards?.length > 0;
             return (
-              <MessageBubble
-                key={i}
-                message={msg}
-                onSpeak={isLast ? onSpeak : null}
-                isLast={isLast}
-              />
+              <React.Fragment key={i}>
+                <MessageBubble
+                  message={msg}
+                  onSpeak={isLast ? onSpeak : null}
+                  isLast={isLast}
+                />
+                {showCards && (
+                  <JobSuggestionCards
+                    cards={msg.suggestCards}
+                    onSelect={onJobSelect}
+                    onNothingResonating={onNothingResonating}
+                    disabled={isLoading}
+                  />
+                )}
+              </React.Fragment>
             );
           })}
           {isLoading && <TypingIndicator />}
@@ -153,7 +250,7 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
         </div>
 
         {/* Input */}
-        <div className="flex-shrink-0 px-4 pb-4 pt-2 z-10">
+        <div className="flex-shrink-0 px-4 pt-2 z-10" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))' }}>
           {micError && <p className="text-red-500 text-xs text-center mb-2 px-2">{micError}</p>}
           <div className="bg-white rounded-xl p-4 flex flex-col gap-4" style={{ border: '1px solid #dbdde6' }}>
             <div className="flex items-center gap-2">

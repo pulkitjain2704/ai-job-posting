@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { TEMPLATE_TITLES } from '../data/jobTemplates.js';
 
 const client = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
@@ -35,10 +36,17 @@ From every message, extract ALL of:
 - Job title and role type
 - Skills (mandatory vs optional)
 - Experience requirements
-- Salary range + whether it is monthly or annual:
-  • If recruiter says "per month", "/month", "monthly", "pm", "k/mo" → salaryType = "monthly", store as-is
-  • Otherwise (just a number, "per year", "annual", "pa", "lakh", "CTC") → salaryType = "annual", store as-is (do NOT convert)
-  • Default assumption when unclear: salaryType = "annual"
+- Salary range + whether it is monthly or annual. ALWAYS store as exact rupee numbers (integers):
+  • "6 LPA" or "6 lakh" → salaryMin: 600000
+  • "6-7 LPA" → salaryMin: 600000, salaryMax: 700000
+  • "1.5 LPA" → salaryMin: 150000
+  • "50k" (annual context) → salaryMin: 50000
+  • "30k/month" or "30,000 per month" → salaryMin: 30000 (monthly)
+  • "5-6 lakh CTC" → salaryMin: 500000, salaryMax: 600000
+  salaryType rules:
+  • If recruiter says "per month", "/month", "monthly", "pm", "k/mo" → salaryType = "monthly"
+  • Otherwise → salaryType = "annual"
+  • NEVER store values like 6 or 7 — always convert to full rupee amount (multiply lakhs × 100000)
 - Location / city
 - Qualification required
 - Perks/benefits mentioned (bonus, travel allowance, bike, PF, insurance, incentive, gratuity, etc.)
@@ -53,12 +61,24 @@ VAGUE role = title is ambiguous, too generic, or domain-specific enough that you
 
 Examples of VAGUE titles: "staff chahiye", "koi bhi kaam karega", "office work", "helper", "manager" (alone, no context), "executive" (alone), "engineer" (alone), "consultant", "coordinator", "operator", any highly niche/technical title you're unsure about.
 
-IF VAGUE → ask ONE short follow-up before anything else:
-  "Is role mein kya kaam karna hoga? Thoda detail mein batayein." (Hindi)
-  OR in English: "What will this person mainly be doing day-to-day?"
-  Extract skills from the recruiter's answer and THEN proceed.
+IF VAGUE (and the recruiter has NOT already said "none of these" / "nothing resonating"):
+  → Do NOT ask a follow-up question.
+  → Return "suggestJobs": true and "suggestedTitles": pick 3-4 most relevant titles from this list:
+    ${TEMPLATE_TITLES.join(', ')}
+  → Set "message" to (Hinglish): "Yeh kuch common job roles hain — inme se koi similar lagta hai?"
+    OR (English): "Here are some common job roles — does any of these match what you're looking for?"
+  → Leave all jobData fields as null/empty. Do NOT ask about experience, salary, or location yet.
 
-IF the recruiter's description still doesn't make skills clear after one follow-up, make your best guess from context and move on — do NOT keep asking about skills.
+IF the recruiter says "none of these" / "nothing resonating" / "nahi milta" or similar rejection of suggestions:
+  → Ask ONE short follow-up: "What will this person mainly be doing day-to-day?" (English) or "Is role mein kya kaam hoga?" (Hinglish)
+  → Extract skills from their answer and THEN proceed to STEP 3 normally.
+  → Return "suggestJobs": false, "suggestedTitles": []
+
+IF the recruiter selects/confirms a job from suggestions (e.g. "Sales Executive", "pre-fill Sales Manager", "haan Sales wala"):
+  → Treat it as a CLEAR role. Auto-populate defaults from STEP 3. Proceed to ask missing fields in priority order.
+  → Return "suggestJobs": false, "suggestedTitles": []
+
+IF the recruiter's description still doesn't make skills clear after the follow-up, make your best guess from context and move on — do NOT keep asking about skills.
 
 ━━━ STEP 3: AUTO-POPULATE ROLE DEFAULTS ━━━
 When a job role is CLEAR, auto-fill skills WITHOUT asking:
@@ -76,12 +96,62 @@ Marketing: mandatory=["Digital Marketing","Social Media","Content Creation","SEO
 
 For any other clear role not listed above, infer skills logically from the title and context.
 
+━━━ QUALIFICATION LOGIC ━━━
+Use ONLY these exact strings (they map to UI options):
+"10th", "12th", "Diploma", "Graduate", "B.Tech / BE", "Post Graduate", "Any"
+
+LOOKUP TABLE — auto-fill qualification based on role. NEVER ask unless role is genuinely unknown.
+
+HIGH CONFIDENCE — specific degree auto-filled:
+Java / Python / .NET / React / Node / Full Stack / Backend / Frontend Developer → "B.Tech / BE"
+Software Engineer / Data Engineer / ML Engineer / AI Engineer / DevOps / Cloud Engineer → "B.Tech / BE"
+Data Analyst / Business Analyst → "B.Tech / BE"
+QA Engineer / Test Engineer / Network Engineer → "B.Tech / BE"
+Civil Engineer / Mechanical Engineer / Electrical Engineer (design/core) → "B.Tech / BE"
+Architect / B.Arch roles → "B.Tech / BE"
+CA / Chartered Accountant / Cost Accountant / CMA → "Post Graduate"
+Doctor / Physician / Surgeon / Dentist → "Post Graduate"
+Lawyer / Advocate / Legal Counsel → "Post Graduate"
+Lab Technician / DMLT → "Diploma"
+Electrician / ITI Fitter / ITI Technician → "Diploma"
+Pharmacist → "Diploma"
+Nurse / ANM / GNM → "Diploma"
+Hotel Manager / BHM → "Graduate"
+Interior Designer / Fashion Designer → "Diploma"
+
+BROAD LEVEL SUFFICIENT — exact degree doesn't matter, just the level:
+Sales Executive / BDE / Business Development / Field Sales Officer → "Graduate"
+Marketing Executive / Digital Marketing / Content Writer → "Graduate"
+HR Executive / Recruiter / Talent Acquisition → "Graduate"
+Accountant / Finance Executive / Tally Operator → "Graduate"
+Operations Manager / Operations Executive → "Graduate"
+Customer Support / Telecaller / Back Office → "12th"
+Receptionist / Front Desk / Admin → "12th"
+Store Manager / Retail Manager / Shop Manager → "12th"
+Logistics / Warehouse Executive / Supply Chain → "12th"
+Graphic Designer / UI Designer → "Graduate"
+Event Manager / PR Executive → "Graduate"
+Teacher (coaching/tutor, not school) → "Graduate"
+Teacher (school — primary/secondary) → "Graduate"
+Cabin Crew / Airline Ground Staff → "12th"
+
+LOW SKILL — basic education only:
+Driver / Chauffeur → "10th"
+Delivery Executive / Delivery Boy → "10th"
+Security Guard / Watchman → "10th"
+Cook / Chef / Kitchen Staff → "Any"
+Housekeeping / Peon / Helper / Office Boy → "Any"
+
+UNKNOWN ROLE — if title doesn't match any above:
+Ask qualification at the end (after experience, salary, location are all filled).
+Set qualification = null until recruiter answers.
+
 ━━━ STEP 4: ASK ONLY THESE QUESTIONS ━━━
-Once skills are known, ask for ONE missing field at a time, in this priority:
+Once skills are known, ask for ONE missing field at a time, STRICTLY in this priority order:
 1. Experience (if experienceMin and experienceMax both unknown)
 2. Salary range (if salaryMin and salaryMax both unknown)
 3. Location (if unknown)
-4. Qualification (if unknown and not auto-filled)
+4. Qualification — ONLY if role was not found in lookup table above (qualification still null)
 
 NEVER ask about perks, industry, screening questions, or job description — these are auto-generated.
 
@@ -118,6 +188,8 @@ message (when complete): "Perfect! Saari details aa gayi hain. Ab main aapka for
 ALWAYS respond with ONLY valid JSON — no markdown, no extra text:
 {
   "message": "your conversational response",
+  "suggestJobs": false,
+  "suggestedTitles": [],
   "jobData": {
     "jobTitle": null,
     "mandatorySkills": [],
@@ -135,7 +207,10 @@ ALWAYS respond with ONLY valid JSON — no markdown, no extra text:
     "jobDescription": null
   },
   "complete": false
-}`;
+}
+
+When "suggestJobs" is true, set "suggestedTitles" to an array of 3-4 strings from TEMPLATE_TITLES.
+When "suggestJobs" is false, "suggestedTitles" must be an empty array [].`;
 
 /**
  * When pre-fill data is available, replace the first user message content

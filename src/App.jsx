@@ -7,6 +7,7 @@ import ReviewScreen from './components/ReviewScreen.jsx';
 import SuccessScreen from './components/SuccessScreen.jsx';
 import { sendMessage } from './services/claudeApi.js';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis.js';
+import { getTemplatesByTitles } from './data/jobTemplates.js';
 
 // App states
 const STATE = {
@@ -75,12 +76,17 @@ export default function App() {
         audioPromise = fetchAudio(earlyText);
       }, preFilledData);
 
-      const { message, jobData: extractedData, complete } = result;
+      const { message, jobData: extractedData, complete, suggestJobs, suggestedTitles } = result;
       // Merge: EMPTY_JOB < preFilledData < Claude's extracted data (Claude wins on non-null values)
       const cleanExtracted = Object.fromEntries(
         Object.entries(extractedData).filter(([, v]) => v !== null && !(Array.isArray(v) && v.length === 0))
       );
       const mergedJobData = { ...EMPTY_JOB, ...(preFilledData || {}), ...cleanExtracted };
+
+      // Resolve job suggestion cards if Claude flagged this as a vague role
+      const suggestCards = (suggestJobs && suggestedTitles?.length)
+        ? getTemplatesByTitles(suggestedTitles)
+        : null;
 
       // Wait for audio (it's been fetching in parallel — usually already done)
       const prepared = audioPromise ? await audioPromise : null;
@@ -93,7 +99,7 @@ export default function App() {
 
       setDisplayMessages((prev) => [
         ...prev,
-        { role: 'assistant', text: message, jobData: mergedJobData },
+        { role: 'assistant', text: message, jobData: mergedJobData, suggestCards },
       ]);
 
       setJobData(mergedJobData);
@@ -169,6 +175,51 @@ export default function App() {
     [processAIResponse, apiHistory]
   );
 
+  // Called when user selects a job card and taps "Pre-fill" or "Edit details"
+  const handleJobSelect = useCallback(
+    async (template, action) => {
+      // Build a rich user message that tells Claude exactly what was chosen
+      const prefillNote = `Mandatory Skills: ${template.mandatorySkills.join(', ')}${template.optionalSkills?.length ? `\nOptional Skills: ${template.optionalSkills.join(', ')}` : ''}\nQualification: ${template.qualification}`;
+
+      let userText;
+      if (action === 'prefill') {
+        userText = `I want to hire a ${template.title}. Here are the standard details:\n${prefillNote}\nPlease use these details and only ask me about the remaining fields (experience, salary, location) one at a time.`;
+      } else {
+        userText = `I want to hire a ${template.title} but want to customise the details. Suggested defaults:\n${prefillNote}\nPlease ask me what I'd like to change, then proceed with the remaining questions.`;
+      }
+
+      // What the user sees is a clean short label, not the big injected text
+      const displayText = action === 'prefill'
+        ? `${template.title} — Pre-fill details`
+        : `${template.title} — Edit details`;
+
+      // Merge template data so ReviewScreen already has it
+      const preFilledData = {
+        jobTitle: template.title,
+        mandatorySkills: template.mandatorySkills,
+        optionalSkills: template.optionalSkills || [],
+        qualification: template.qualification,
+        industry: template.industry || [],
+      };
+
+      setError(null);
+      setDisplayMessages((prev) => [...prev, { role: 'user', text: displayText }]);
+      await processAIResponse(userText, apiHistory, preFilledData);
+    },
+    [processAIResponse, apiHistory]
+  );
+
+  // Called when user taps "I don't find anything resonating"
+  const handleNothingResonating = useCallback(
+    async () => {
+      const userText = 'None of these match. Let me describe the role instead.';
+      setError(null);
+      setDisplayMessages((prev) => [...prev, { role: 'user', text: userText }]);
+      await processAIResponse(userText, apiHistory);
+    },
+    [processAIResponse, apiHistory]
+  );
+
   const handleSpeak = useCallback(
     (text) => {
       if (isSpeaking) {
@@ -201,6 +252,9 @@ export default function App() {
         onSpeak={handleSpeak}
         onReview={() => setAppState(STATE.REVIEW)}
         hasJobData={hasReachedReview}
+        onBack={() => setAppState(STATE.WELCOME)}
+        onJobSelect={handleJobSelect}
+        onNothingResonating={handleNothingResonating}
       />
     );
   }
