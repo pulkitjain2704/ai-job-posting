@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWhisperRecognition } from '../hooks/useWhisperRecognition.js';
 
 // ── Sparkle icon ────────────────────────────────────────────────────────────
@@ -15,13 +15,11 @@ function MessageBubble({ message, onSpeak, isLast }) {
   const isUser = message.role === 'user';
   return (
     <div className={`flex items-start gap-[10px] animate-slide-up w-full ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      {/* Orb avatar only on the latest AI message — no spacer for older ones */}
       {!isUser && isLast && (
         <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden mt-1">
           <img src="/orb.gif" alt="AI" className="w-full h-full object-cover" draggable={false} />
         </div>
       )}
-
       <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}
         style={{ maxWidth: isUser ? '75%' : 'calc(100% - 40px)' }}>
         <div
@@ -49,8 +47,189 @@ function MessageBubble({ message, onSpeak, isLast }) {
   );
 }
 
+// ── Edit template bottom sheet ───────────────────────────────────────────────
+const QUALIFICATIONS = ['10th', '12th', 'Diploma', 'Graduate', 'Post Graduate', 'Any'];
+
+function SkillChip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-medium"
+      style={{ background: '#eef2ff', color: '#3730a3' }}>
+      {label}
+      <button
+        onClick={onRemove}
+        className="flex items-center justify-center w-3.5 h-3.5 rounded-full transition-colors"
+        style={{ color: '#6366f1' }}
+        aria-label={`Remove ${label}`}
+      >
+        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M2 2l6 6M8 2l-6 6" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
+function AddSkillInput({ onAdd, placeholder }) {
+  const [value, setValue] = useState('');
+
+  const commit = () => {
+    const trimmed = value.trim();
+    if (trimmed) { onAdd(trimmed); setValue(''); }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+        placeholder={placeholder}
+        className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg outline-none"
+        style={{ background: '#f4f7ff', border: '1px solid #e0e4ef', color: '#253858' }}
+      />
+      <button
+        onClick={commit}
+        className="flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-95"
+        style={{ background: '#4f46e5', color: '#fff' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function EditTemplateSheet({ template, onConfirm, onClose }) {
+  const [title, setTitle] = useState(template.title);
+  const [mandatory, setMandatory] = useState([...template.mandatorySkills]);
+  const [optional, setOptional] = useState([...(template.optionalSkills || [])]);
+  const [qualification, setQualification] = useState(template.qualification || 'Graduate');
+
+  const removeFrom = (list, setList, skill) =>
+    setList(list.filter((s) => s !== skill));
+
+  const addTo = (list, setList, skill) => {
+    if (!list.includes(skill)) setList([...list, skill]);
+  };
+
+  const handleConfirm = () => {
+    onConfirm({ ...template, title, mandatorySkills: mandatory, optionalSkills: optional, qualification });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col justify-end animate-fade-in"
+      style={{ background: 'rgba(15,23,42,0.45)', maxWidth: 420, margin: '0 auto' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="bg-white rounded-t-3xl flex flex-col"
+        style={{ maxHeight: '88vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-9 h-1 rounded-full" style={{ background: '#e0e4ef' }} />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid #f0f2fa' }}>
+          <h2 className="font-bold text-[16px]" style={{ color: '#253858' }}>Edit job details</h2>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+            style={{ background: '#f0f2fa', color: '#6b7794' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5 no-scrollbar">
+
+          {/* Job Title */}
+          <div>
+            <label className="block text-[11px] font-semibold tracking-wider mb-1.5" style={{ color: '#9ba3b5' }}>
+              JOB TITLE
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl text-[14px] font-medium outline-none"
+              style={{ background: '#f4f7ff', border: '1.5px solid #e0e4ef', color: '#253858' }}
+            />
+          </div>
+
+          {/* Mandatory Skills */}
+          <div>
+            <label className="block text-[11px] font-semibold tracking-wider mb-1.5" style={{ color: '#9ba3b5' }}>
+              MANDATORY SKILLS
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {mandatory.map((s) => (
+                <SkillChip key={s} label={s} onRemove={() => removeFrom(mandatory, setMandatory, s)} />
+              ))}
+            </div>
+            <AddSkillInput placeholder="Add skill, press Enter" onAdd={(s) => addTo(mandatory, setMandatory, s)} />
+          </div>
+
+          {/* Optional Skills */}
+          <div>
+            <label className="block text-[11px] font-semibold tracking-wider mb-1.5" style={{ color: '#9ba3b5' }}>
+              OPTIONAL SKILLS
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {optional.map((s) => (
+                <SkillChip key={s} label={s} onRemove={() => removeFrom(optional, setOptional, s)} />
+              ))}
+            </div>
+            <AddSkillInput placeholder="Add skill, press Enter" onAdd={(s) => addTo(optional, setOptional, s)} />
+          </div>
+
+          {/* Qualification */}
+          <div>
+            <label className="block text-[11px] font-semibold tracking-wider mb-2" style={{ color: '#9ba3b5' }}>
+              MINIMUM QUALIFICATION
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {QUALIFICATIONS.map((q) => {
+                const active = qualification === q;
+                return (
+                  <button
+                    key={q}
+                    onClick={() => setQualification(q)}
+                    className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all active:scale-95"
+                    style={active
+                      ? { background: '#253858', color: '#fff', border: '1.5px solid #253858' }
+                      : { background: '#fff', color: '#465166', border: '1.5px solid #e0e4ef' }}
+                  >
+                    {q}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="flex-shrink-0 px-5 pt-3" style={{ borderTop: '1px solid #f0f2fa' }}>
+          <button
+            onClick={handleConfirm}
+            className="w-full py-3.5 rounded-xl text-[14px] font-semibold transition-all active:scale-[0.98]"
+            style={{ background: '#253858', color: '#fff' }}
+          >
+            Confirm &amp; Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Job suggestion cards ─────────────────────────────────────────────────────
-function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) {
+function JobSuggestionCards({ cards, onPrefill, onEditRequest, onNothingResonating, disabled }) {
   const [selected, setSelected] = useState(null);
 
   const handleCardClick = (card) => {
@@ -58,15 +237,11 @@ function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) 
     setSelected(card.id);
   };
 
-  const handleAction = (action) => {
-    if (disabled || !selected) return;
-    const card = cards.find((c) => c.id === selected);
-    if (card) onSelect(card, action);
-  };
+  const selectedCard = cards.find((c) => c.id === selected);
 
   return (
     <div className="flex flex-col gap-2 mt-1 ml-9">
-      {/* Cards grid */}
+      {/* Cards */}
       <div className="flex flex-col gap-2">
         {cards.map((card) => {
           const isSelected = selected === card.id;
@@ -76,22 +251,16 @@ function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) 
               onClick={() => handleCardClick(card)}
               disabled={disabled}
               className="text-left px-3.5 py-3 rounded-xl transition-all active:scale-[0.98]"
-              style={
-                isSelected
-                  ? { background: '#4f46e5', border: '1.5px solid #4f46e5' }
-                  : { background: '#fff', border: '1.5px solid #e0e4ef' }
-              }
+              style={isSelected
+                ? { background: '#4f46e5', border: '1.5px solid #4f46e5' }
+                : { background: '#fff', border: '1.5px solid #e0e4ef' }}
             >
-              <p
-                className="font-semibold text-[13px] leading-snug"
-                style={{ color: isSelected ? '#fff' : '#253858' }}
-              >
+              <p className="font-semibold text-[13px] leading-snug"
+                style={{ color: isSelected ? '#fff' : '#253858' }}>
                 {card.title}
               </p>
-              <p
-                className="text-[11px] mt-0.5 line-clamp-1"
-                style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : '#6b7794' }}
-              >
+              <p className="text-[11px] mt-0.5 line-clamp-1"
+                style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : '#6b7794' }}>
                 {card.mandatorySkills.slice(0, 3).join(' · ')}
               </p>
             </button>
@@ -99,11 +268,11 @@ function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) 
         })}
       </div>
 
-      {/* Action buttons — appear after a card is selected */}
+      {/* Action buttons after selection */}
       {selected && (
         <div className="flex gap-2 mt-1 animate-fade-in">
           <button
-            onClick={() => handleAction('prefill')}
+            onClick={() => onPrefill(selectedCard)}
             disabled={disabled}
             className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
             style={{ background: '#253858', color: '#fff' }}
@@ -111,7 +280,7 @@ function JobSuggestionCards({ cards, onSelect, onNothingResonating, disabled }) 
             Pre-fill details
           </button>
           <button
-            onClick={() => handleAction('edit')}
+            onClick={() => onEditRequest(selectedCard)}
             disabled={disabled}
             className="flex-1 py-2.5 rounded-xl text-[13px] font-medium transition-all active:scale-95"
             style={{ background: '#fff', color: '#253858', border: '1.5px solid #dbdde6' }}
@@ -143,7 +312,7 @@ function TypingIndicator() {
       <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden mt-1">
         <img src="/orb.gif" alt="AI" className="w-full h-full object-cover" draggable={false} />
       </div>
-      <div className="px-4 py-3 bg-white rounded-[4px_16px_16px_16px] flex items-center gap-1" style={{ borderRadius: '4px 16px 16px 16px' }}>
+      <div className="px-4 py-3 bg-white flex items-center gap-1" style={{ borderRadius: '4px 16px 16px 16px' }}>
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -159,11 +328,11 @@ function TypingIndicator() {
 // ── Main ChatScreen ───────────────────────────────────────────────────────────
 export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak, onReview, hasJobData, onBack, onJobSelect, onNothingResonating }) {
   const [inputValue, setInputValue] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState(null);
   const messagesEndRef = useRef(null);
 
   const { isListening, isTranscribing, isSupported, error: micError, toggle, stop } = useWhisperRecognition({
     onResult: (text) => setInputValue((prev) => (prev ? prev + ' ' + text : text)),
-    // Give Whisper the current input as context so it stays in the right language
     getPrompt: () => inputValue,
   });
 
@@ -183,7 +352,12 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   };
 
-  // Index of the last assistant message
+  // Edit sheet confirm: treat the edited template exactly like a pre-fill selection
+  const handleEditConfirm = (editedTemplate) => {
+    setEditingTemplate(null);
+    onJobSelect(editedTemplate, 'prefill');
+  };
+
   const lastAssistantIdx = messages.reduce((last, m, i) => m.role === 'assistant' ? i : last, -1);
 
   return (
@@ -223,8 +397,6 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 no-scrollbar z-10">
           {messages.map((msg, i) => {
-            // Show orb only on last AI message — and only when NOT loading
-            // (while loading, the TypingIndicator carries the orb instead)
             const isLast = i === lastAssistantIdx && !isLoading;
             const showCards = isLast && msg.suggestCards?.length > 0;
             return (
@@ -237,7 +409,8 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
                 {showCards && (
                   <JobSuggestionCards
                     cards={msg.suggestCards}
-                    onSelect={onJobSelect}
+                    onPrefill={(card) => onJobSelect(card, 'prefill')}
+                    onEditRequest={(card) => setEditingTemplate(card)}
                     onNothingResonating={onNothingResonating}
                     disabled={isLoading}
                   />
@@ -299,6 +472,15 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
           </div>
         </div>
       </div>
+
+      {/* Edit template sheet — rendered outside scroll area so it overlays everything */}
+      {editingTemplate && (
+        <EditTemplateSheet
+          template={editingTemplate}
+          onConfirm={handleEditConfirm}
+          onClose={() => setEditingTemplate(null)}
+        />
+      )}
     </div>
   );
 }

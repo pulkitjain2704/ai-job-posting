@@ -175,25 +175,14 @@ export default function App() {
     [processAIResponse, apiHistory]
   );
 
-  // Called when user selects a job card and taps "Pre-fill" or "Edit details"
+  // Called when user selects a job card (pre-fill) or confirms edits in the sheet
+  // `template` may be the original or user-edited version — treated identically
   const handleJobSelect = useCallback(
     async (template, action) => {
-      // Build a rich user message that tells Claude exactly what was chosen
       const prefillNote = `Mandatory Skills: ${template.mandatorySkills.join(', ')}${template.optionalSkills?.length ? `\nOptional Skills: ${template.optionalSkills.join(', ')}` : ''}\nQualification: ${template.qualification}`;
+      const userText = `I want to hire a ${template.title}. Here are the details:\n${prefillNote}\nPlease use these details and only ask me about the remaining fields (experience, salary, location) one at a time.`;
+      const displayText = `${template.title} — ${action === 'prefill' ? 'Pre-fill details' : 'Edit confirmed'}`;
 
-      let userText;
-      if (action === 'prefill') {
-        userText = `I want to hire a ${template.title}. Here are the standard details:\n${prefillNote}\nPlease use these details and only ask me about the remaining fields (experience, salary, location) one at a time.`;
-      } else {
-        userText = `I want to hire a ${template.title} but want to customise the details. Suggested defaults:\n${prefillNote}\nPlease ask me what I'd like to change, then proceed with the remaining questions.`;
-      }
-
-      // What the user sees is a clean short label, not the big injected text
-      const displayText = action === 'prefill'
-        ? `${template.title} — Pre-fill details`
-        : `${template.title} — Edit details`;
-
-      // Merge template data so ReviewScreen already has it
       const preFilledData = {
         jobTitle: template.title,
         mandatorySkills: template.mandatorySkills,
