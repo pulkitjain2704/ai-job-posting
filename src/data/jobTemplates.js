@@ -245,6 +245,8 @@ export const JOB_TEMPLATES = [
     industry: ['Hospitality', 'Restaurant', 'Corporate Catering'],
     keywords: ['cook', 'chef', 'kitchen', 'food', 'catering', 'hotel'],
   },
+
+
   {
     id: 'electrician',
     title: 'Electrician / Technician',

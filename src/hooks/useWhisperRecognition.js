@@ -76,9 +76,11 @@ export function useWhisperRecognition({ onResult, getPrompt } = {}) {
         const blob = new Blob(chunksRef.current, { type: effectiveMime });
         chunksRef.current = [];
 
-        // Pick file extension that Whisper accepts
-        const ext = effectiveMime.includes('ogg') ? 'ogg'
-          : effectiveMime.includes('mp4') ? 'mp4'
+        // Strip codec info (e.g. "audio/webm;codecs=opus") for extension lookup
+        const baseMime = effectiveMime.split(';')[0].trim();
+        // iOS Safari records audio/mp4 — send as .m4a which Whisper handles reliably
+        const ext = baseMime.includes('ogg') ? 'ogg'
+          : baseMime.includes('mp4') || baseMime.includes('m4a') || baseMime.includes('aac') ? 'm4a'
           : 'webm';
 
         setIsTranscribing(true);
@@ -88,7 +90,8 @@ export function useWhisperRecognition({ onResult, getPrompt } = {}) {
           form.append('model', 'whisper-1');
           // Prompt helps Whisper stay in the correct language.
           // Use whatever the user has already typed; fall back to the English default.
-          const prompt = getPrompt?.()?.trim() || DEFAULT_PROMPT;
+          const userContext = getPrompt?.()?.trim();
+          const prompt = `${DEFAULT_PROMPT}${userContext ? ' ' + userContext : ''}`;
           form.append('prompt', prompt);
 
           const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {

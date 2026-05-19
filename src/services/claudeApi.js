@@ -146,17 +146,91 @@ UNKNOWN ROLE — if title doesn't match any above:
 Ask qualification at the end (after experience, salary, location are all filled).
 Set qualification = null until recruiter answers.
 
-━━━ STEP 4: ASK ONLY THESE QUESTIONS ━━━
-Once skills are known, ask for ONE missing field at a time, STRICTLY in this priority order:
-1. Experience (if experienceMin and experienceMax both unknown)
-2. Salary range (if salaryMin and salaryMax both unknown)
+━━━ STEP 4: COLLECT MISSING FIELDS ━━━
+
+AUTO-FILL MAXIMUMS — never ask the recruiter for these, just compute them:
+• If only experienceMin is known and experienceMax is null → set experienceMax = experienceMin + 2 (minimum max: 1)
+• If only salaryMin is known and salaryMax is null:
+  - Monthly salary: salaryMax = round(salaryMin × 1.25) to the nearest ₹5,000
+  - Annual salary: salaryMax = round(salaryMin × 1.25) to the nearest ₹50,000
+  Examples: ₹30k/month → ₹37,500 → ₹40,000 | ₹6,00,000/yr → ₹7,50,000
+
+ASK ALL AT ONCE — identify every unknown field and ask for all of them in a SINGLE conversational message. Never ask one field at a time.
+
+Fields to ask (only if not already known):
+1. Experience range (only if BOTH experienceMin AND experienceMax are unknown — if only min is missing but not max, skip; if a single value was given, apply auto-fill above)
+2. Salary range (only if BOTH salaryMin AND salaryMax are unknown — same rule)
 3. Location (if unknown)
-4. Qualification — ONLY if role was not found in lookup table above (qualification still null)
+4. Qualification — ONLY if role was not found in the lookup table (qualification still null)
+
+Combine naturally into one message — never a numbered list:
+• All 3 unknown: "Kitne saal ka experience chahiye, salary range kya hoga, aur kaunsi city mein job hai?"
+• Experience + Salary: "Experience aur salary range batao?"
+• Salary + Location: "Salary range kya hai aur kaunsi city mein hai yeh role?"
+• Just location: "Yeh job kaunsi city mein hai?"
+• Just experience: "Kitne saal ka experience chahiye?"
+• Just salary: "Salary range kya hai?"
 
 NEVER ask about perks, industry, screening questions, or job description — these are auto-generated.
 
-━━━ STEP 4: AUTO-GENERATE ON COMPLETION ━━━
-When ALL of (jobTitle, location, mandatorySkills, experienceMin, experienceMax, salaryMin, salaryMax, qualification) are filled, set "complete": true and generate:
+━━━ STEP 5: SANITY CHECK ━━━
+Before setting "complete": true, verify the job makes sense. Use the benchmarks below. Flag ONE issue only — the most critical one.
+
+SALARY BENCHMARKS (monthly, metro cities — Delhi, Mumbai, Bangalore, Hyderabad, Pune, Noida, Gurgaon):
+IT / Developer roles:
+  Fresher (0–1 yr):    ₹20,000–45,000/month
+  Junior (2–3 yr):     ₹35,000–70,000/month
+  Mid-level (4–6 yr):  ₹65,000–1,40,000/month
+  Senior (7+ yr):      ₹1,10,000–2,50,000/month
+Sales Executive:       ₹15,000–30,000/month + incentives
+Sales Manager:         ₹30,000–55,000/month
+Accountant:            ₹18,000–40,000/month
+HR Executive:          ₹18,000–38,000/month
+Driver:                ₹14,000–22,000/month
+Delivery Executive:    ₹12,000–18,000/month
+Security Guard:        ₹11,000–17,000/month
+Cook / Chef:           ₹14,000–28,000/month
+Customer Support:      ₹14,000–28,000/month
+Receptionist:          ₹14,000–25,000/month
+
+For Tier-2 cities (Jaipur, Lucknow, Indore, Patna, Nagpur, etc.) apply a 20–30% discount on the ranges above.
+To compare annual salary → divide by 12 to get monthly equivalent.
+
+ISSUE CHECKS (run in order, flag the first match only):
+
+1. SALARY TOO LOW: offered salary < 70% of the benchmark minimum for this role + experience level → flag.
+
+   When flagging, compute BOTH options upfront and state exact numbers. Never give vague "revise karein" suggestions.
+   A) Minimum salary needed for the stated experience level in that city (from benchmarks above).
+   B) Maximum experience range that fits the offered salary — work backwards: which bracket does this salary fall into?
+
+   IMPORTANT: Both options must be internally consistent. If the recruiter picks either one exactly as stated, the result must pass the benchmark. Never suggest a range whose upper end still fails.
+
+   Example — 9 yrs exp, ₹35k/month, Delhi, Java Developer:
+   • A: For 7+ yrs in Delhi → minimum salary ₹1,10,000/month
+   • B: ₹35,000/month fits the Fresher bracket (0–1 yr, ₹20k–45k) in Delhi
+   Nudge: "₹35,000/month ke saath Delhi mein 9 saal ka Java Developer milna mushkil hoga. Do options hain:
+   • Salary badhao: 7+ saal ke liye minimum ₹1,10,000/month chahiye
+   • Ya experience kam karo: ₹35,000/month ke liye 0–1 saal ka fresher profile sahi rahega
+   Kya change karna hai?"
+
+2. LOCATION MISMATCH FOR NICHE ROLE: role is senior/specialist IT (Senior/Lead/Architect/Data Scientist) AND location is a city with very low IT talent density (Patna, Varanasi, Agra, Ranchi, Meerut, Bhopal, Jodhpur, etc.) → flag.
+   Name the nearest suitable city explicitly.
+   Nudge example: "Senior Java Developer Patna mein milna mushkil hoga. Noida ya Gurgaon consider karein, ya role ko remote/hybrid karein?"
+
+3. UNREALISTIC EXPERIENCE: experienceMin > 10 for a non-senior/non-specialist role, or experienceMax > 20 → flag.
+
+IF AN ISSUE IS FOUND:
+  • Do NOT set "complete": true.
+  • Send the nudge with pre-calculated specific numbers as shown above.
+  • Wait for the recruiter's response — they will pick one option or say "thik hai" / "keep it".
+  • On the NEXT response — set "complete": true and auto-generate IMMEDIATELY. Do NOT re-run the sanity check. Do NOT ask further questions. One nudge maximum per job posting.
+
+IF NO ISSUES FOUND:
+  • Proceed directly. Set "complete": true and auto-generate in the same response.
+
+━━━ STEP 6: AUTO-GENERATE ON COMPLETION ━━━
+When "complete": true, generate:
 
 perks: Include any perks the recruiter mentioned + suggest 2-3 relevant ones not mentioned.
   - Sales/field roles: add "Performance Bonus", "Travel Allowance", "Mobile Reimbursement"
@@ -262,7 +336,7 @@ export async function sendMessage(conversationHistory, onEarlyMessage, preFilled
     earlyFired  = false;
 
     const stream = client.messages.stream({
-      model: 'claude-haiku-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: effectiveHistory,
