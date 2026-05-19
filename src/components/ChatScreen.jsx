@@ -331,8 +331,8 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
   const [editingTemplate, setEditingTemplate] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const { isListening, isTranscribing, isSupported, error: micError, toggle, stop } = useWhisperRecognition({
-    onResult: (text) => setInputValue((prev) => (prev ? prev + ' ' + text : text)),
+  const { isListening, isTranscribing, isSupported, error: micError, start: startMic, stop: stopMic } = useWhisperRecognition({
+    onResult: (text) => { if (text && !isLoading) onSendMessage(text); },
     getPrompt: () => inputValue,
   });
 
@@ -343,7 +343,7 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
   const handleSubmit = () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
-    stop();
+    stopMic();
     setInputValue('');
     onSendMessage(text);
   };
@@ -449,13 +449,22 @@ export default function ChatScreen({ messages, isLoading, onSendMessage, onSpeak
                 </button>
               )}
               {isSupported && (
-                <button onClick={toggle} disabled={isLoading || isTranscribing}
-                  className="flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95"
-                  style={isListening
-                    ? { background: '#e53e3e', color: '#fff' }
-                    : isTranscribing
-                    ? { background: '#f0f2fa', color: '#a0aec0', border: '1px solid #e2e8f0' }
-                    : { background: '#fff', color: '#6b7794', border: '1px solid #dbdde6' }}>
+                <button
+                  onPointerDown={(e) => { e.preventDefault(); startMic(); }}
+                  onPointerUp={stopMic}
+                  onPointerLeave={() => { if (isListening) stopMic(); }}
+                  onPointerCancel={stopMic}
+                  disabled={isLoading || isTranscribing}
+                  className="flex items-center justify-center w-10 h-10 rounded-full transition-all active:scale-95 select-none"
+                  style={{
+                    touchAction: 'none',
+                    ...(isListening
+                      ? { background: '#e53e3e', color: '#fff' }
+                      : isTranscribing
+                      ? { background: '#f0f2fa', color: '#a0aec0', border: '1px solid #e2e8f0' }
+                      : { background: '#fff', color: '#6b7794', border: '1px solid #dbdde6' }),
+                  }}
+                >
                   {isListening ? (
                     <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
                   ) : isTranscribing ? (

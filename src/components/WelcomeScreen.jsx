@@ -110,8 +110,9 @@ export default function WelcomeScreen({ onStart }) {
   const fileInputRef = useRef(null);
   const detected = detectCues(inputValue);
 
-  const { isListening, isTranscribing, isSupported, error, toggle, stop } = useWhisperRecognition({
-    onResult: (text) => setInputValue((prev) => (prev ? prev + ' ' + text : text)),
+  const { isListening, isTranscribing, isSupported, error, start, stop } = useWhisperRecognition({
+    // Voice sends immediately — no text box fill needed
+    onResult: (text) => { if (text) onStart(text, null); },
     getPrompt: () => inputValue,
   });
 
@@ -299,7 +300,7 @@ export default function WelcomeScreen({ onStart }) {
               placeholder={
                 isParsing ? 'Parsing document…' :
                 uploadedFile ? 'Add any extra details (optional)' :
-                isListening ? 'Recording… click End when done' :
+                isListening ? 'Listening… release to send' :
                 isTranscribing ? 'Transcribing…' :
                 'Tell us who do you want to hire'
               }
@@ -327,21 +328,25 @@ export default function WelcomeScreen({ onStart }) {
 
             {isSupported && (
               <button
-                onClick={toggle}
+                onPointerDown={(e) => { e.preventDefault(); start(); }}
+                onPointerUp={stop}
+                onPointerLeave={() => { if (isListening) stop(); }}
+                onPointerCancel={stop}
                 disabled={isTranscribing}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[26px] text-[14px] font-medium transition-all duration-200"
-                style={
-                  isListening
+                className="flex items-center gap-2 px-4 py-2.5 rounded-[26px] text-[14px] font-medium transition-all duration-200 select-none"
+                style={{
+                  touchAction: 'none',
+                  ...(isListening
                     ? { background: '#e53e3e', color: '#fff', border: '1px solid #e53e3e' }
                     : isTranscribing
                     ? { background: '#f0f2fa', color: '#a0aec0', border: '1px solid #e2e8f0' }
-                    : { background: '#fff', color: '#253858', border: '1px solid #dbdde6' }
-                }
+                    : { background: '#fff', color: '#253858', border: '1px solid #dbdde6' }),
+                }}
               >
                 {isListening ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    End
+                    Listening…
                   </>
                 ) : isTranscribing ? (
                   <>
